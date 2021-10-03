@@ -1,16 +1,17 @@
 import argparse
 import torch
 from networks import FullyConnected, Conv
+import sys
 
 DEVICE = 'cpu'
 INPUT_SIZE = 28
 
 
 def analyze(net, inputs, eps, true_label):
-    return 0
+    return 1
 
 
-def main():
+def main(args):
     parser = argparse.ArgumentParser(description='Neural network verification using DeepZ relaxation')
     parser.add_argument('--net',
                         type=str,
@@ -18,7 +19,7 @@ def main():
                         required=True,
                         help='Neural network architecture which is supposed to be verified.')
     parser.add_argument('--spec', type=str, required=True, help='Test case to verify.')
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     with open(args.spec, 'r') as f:
         lines = [line[:-1] for line in f.readlines()]
@@ -57,10 +58,12 @@ def main():
     assert pred_label == true_label
 
     if analyze(net, inputs, eps, true_label):
-        print('verified')
+        # print('verified')
+        return 'verified'
     else:
-        print('not verified')
+        # print('not verified')
+        return 'not verified'
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
