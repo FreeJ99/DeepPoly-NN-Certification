@@ -1,6 +1,5 @@
 #!/home/isidora/miniconda3/envs/riai/bin/python
 import os
-import re
 from verifier import main
 
 class bcolors:
@@ -25,7 +24,7 @@ nets = ['fc1', 'fc2', 'fc3', 'fc4', 'fc5', 'fc6', 'fc7', 'conv1', 'conv2', 'conv
 
 idx = 0
 for net in nets:
-    print(f"Evaluating network ${net}:")
+    print(f"Evaluating {net}:")
 
     for spec in os.listdir(f"../test_cases/{net}"):
         out = main([
@@ -33,8 +32,8 @@ for net in nets:
             "--spec", f"../test_cases/{net}/{spec}"
         ])
         if out == gt[idx]:
-            print(f"Out: {out}\t\t{bcolors.OKGREEN}OK{bcolors.ENDC}")
+            print(f"{spec}\t{out}\t{bcolors.OKGREEN}OK{bcolors.ENDC}")
         else:
-            print(f"Out: {out}\t\t{bcolors.FAIL}WA{bcolors.ENDC}")
-        print(out, gt[idx])
+            print(f"{spec} \t{out}\t{bcolors.FAIL}WA{bcolors.ENDC}")
+        print()
         idx += 1
