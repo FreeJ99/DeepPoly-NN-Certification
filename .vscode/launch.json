@@ -1,0 +1,27 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "verifier",
+            "type": "python",
+            "request": "launch",
+            "program": "verifier.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/code",
+            "args": [
+                "--net", "fc1",
+                "--spec", "../test_cases/fc1/img0_0.06200.txt"
+            ]
+        },
+        {
+            "name": "Box test",
+            "type": "python",
+            "request": "launch",
+            "program": "code/box.py",
+            "console": "integratedTerminal",
+        }
+    ]
+}

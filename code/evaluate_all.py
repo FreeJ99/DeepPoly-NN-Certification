@@ -1,4 +1,3 @@
-#!/home/isidora/miniconda3/envs/riai/bin/python
 import os
 from verifier import main
 
