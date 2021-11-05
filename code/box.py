@@ -17,8 +17,8 @@ class Box():
         self.u = upper_bounds
 
 
-def transform_box_layer(box: Box, layer: nn.Module) -> Box:
-    # Box abstract transformers
+
+def transform_box(box: Box, layer: nn.Module) -> Box:
     if isinstance(layer, Normalization):
         m = layer.mean.detach().numpy()
         s = layer.sigma.detach().numpy()
@@ -31,13 +31,9 @@ def transform_box_layer(box: Box, layer: nn.Module) -> Box:
 
     elif isinstance(layer, nn.Linear):
         W = layer.weight.detach().numpy()
-        lower_bounds = np.sum(np.minimum(W * box.l, W * box.u), axis = 1)
-        upper_bounds = np.sum(np.maximum(W * box.l, W * box.u), axis = 1)
-
-        if layer.bias != None:
-            b = layer.bias.detach().numpy()
-            lower_bounds += b
-            upper_bounds += b
+        b = layer.bias.detach().numpy()
+        lower_bounds = b + np.sum(np.minimum(W * box.l, W * box.u), axis = 1)
+        upper_bounds = b + np.sum(np.maximum(W * box.l, W * box.u), axis = 1)
         
     elif isinstance(layer, nn.ReLU):
         lower_bounds = np.maximum(box.l, 0)
@@ -48,28 +44,41 @@ def transform_box_layer(box: Box, layer: nn.Module) -> Box:
 
     return Box(lower_bounds, upper_bounds)
 
-def box_verify_net(net: nn.Module, inputs: torch.Tensor, eps: float, true_label: int) -> Tuple[bool, List[Box]]:
-    net_layers = [module
-        for module in net.modules()
-        if not isinstance(module, (FullyConnected, nn.Sequential))]
 
-    boxes = []
-    # Create a box for inputs
-    lower_bounds = np.maximum(inputs.detach().numpy() - eps, 0)
-    upper_bounds = np.minimum(inputs.detach().numpy() + eps, 1)
-    boxes.append(Box(lower_bounds, upper_bounds))
 
-    for layer in net_layers:
-        boxes.append(transform_box_layer(boxes[-1], layer))
+class BoxVerifier(): 
+    boxes: List[Box]
+    true_label: int
+    eps: float
 
-    target_l = boxes[-1].l[true_label]
-    other_idx = np.arange(len(boxes[-1].l)) != true_label
-    max_other_score = boxes[-1].u[other_idx].max()
+    def __init__(self, net: nn.Module, inputs: torch.Tensor, eps: float, true_label: int):
+        self.true_label = true_label
+        self.eps = eps
 
-    if target_l > max_other_score:
-        return (True, boxes)
-    else:
-        return (False, boxes)
+        net_layers = [module
+            for module in net.modules()
+            if not isinstance(module, (FullyConnected, nn.Sequential))]
+
+        self.boxes = []
+        # Create a box for inputs
+        lower_bounds = np.maximum(inputs.detach().numpy() - eps, 0)
+        upper_bounds = np.minimum(inputs.detach().numpy() + eps, 1)
+        self.boxes.append(Box(lower_bounds, upper_bounds))
+
+        for layer in net_layers:
+            self.boxes.append(transform_box(self.boxes[-1], layer))
+
+
+    def verify(self) -> bool:
+        target_l = self.boxes[-1].l[self.true_label]
+        other_idx = np.arange(len(self.boxes[-1].l)) != self.true_label
+        max_other_score = self.boxes[-1].u[other_idx].max()
+
+        if target_l > max_other_score:
+            return True
+        else:
+            return False
+
 
 if __name__ == "__main__":
     l1 = nn.Linear(2, 2)
@@ -86,7 +95,9 @@ if __name__ == "__main__":
     in2 = torch.Tensor([0.3, 0.4])
     eps2 = 0.3
     
-    ver1, boxes1 = box_verify_net(net, in1, eps1, 0)
+    verifier = BoxVerifier(net, in1, eps1, 0)
+    ver1 = verifier.verify()
+    boxes1 = verifier.boxes
     print(f"Verified 1: {ver1}")
     print("Bounds:")
     for box in boxes1:
@@ -97,7 +108,9 @@ if __name__ == "__main__":
 
     assert ver1 == True
 
-    ver2, boxes2 = box_verify_net(net, in2, eps2, 0)
+    verifier = BoxVerifier(net, in2, eps2, 0)
+    ver2 = verifier.verify()
+    boxes2 = verifier.boxes
     print(f"Verified 2: {ver2}")
     print("Bounds:")
     for box in boxes2:
@@ -106,4 +119,3 @@ if __name__ == "__main__":
         print("==========")
 
     assert ver2 == False
-

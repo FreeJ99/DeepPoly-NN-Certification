@@ -7,7 +7,7 @@ from torch import nn
 import numpy as np
 
 from networks import FullyConnected, Conv, Normalization
-from box import Box, transform_box_layer, box_verify_net
+from box import BoxVerifier
 
 DEVICE = 'cpu'
 INPUT_SIZE = 28
@@ -17,7 +17,8 @@ def analyze(net: nn.Module, inputs: torch.Tensor, eps: float, true_label: int) -
     # While the property can't be proven
     # Backsubstitute variables in existing inequlities
     # How I am going to represent these inequalities?
-    return box_verify_net(net, inputs, eps, true_label)[0]
+    verifier = BoxVerifier(net, inputs, eps, true_label)
+    return verifier.verify()
 
 
 def main(args):
