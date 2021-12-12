@@ -20,8 +20,9 @@ class DeepPoly():
     box: Box
     input_shape: Tuple[int]
     layer_shape: Tuple[int]
+    name: str # useful for debugging
 
-    def __init__(self, l_bias, l_weights, u_bias, u_weights, box):
+    def __init__(self, l_bias, l_weights, u_bias, u_weights, box, name = ""):
         self.l_bias = l_bias
         self.l_weights = l_weights
         self.u_bias = u_bias
@@ -29,12 +30,22 @@ class DeepPoly():
         self.box = box
         self.layer_shape = box.l.shape
         self.input_shape = l_weights.shape[box.l.ndim:]
-        print(self.input_shape)
+        self.name = name
     
     def __repr__(self):
-        return "DPoly:\n{0}\n{1}\n{2}\n{3}\nBox:\n{4}\n{5}\n\n"\
-            .format(self.l_bias, self.l_weights, self.u_bias, self.u_weights, 
-                self.box.l, self.box.u)
+        lines = [f"DPoly {self.name}:"]
+        for i in range(len(self.l_bias)):
+            lines.append(f"neur{i}:")
+            lines.append(f"\t>= {self.l_weights[i]} + {self.l_bias[i]}")
+            lines.append(f"\t<= {self.u_weights[i]} + {self.u_bias[i]}")
+            lines.append(f"\tl = {self.box.l[i]}")
+            lines.append(f"\tu = {self.box.u[i]}")
+        lines.append("\n")
+
+        return "\n".join(lines)
+        # "{0}\n{1}\n{2}\n{3}\nBox:\n{4}\n{5}\n\n"\
+        #     .format(self.l_bias, self.l_weights, self.u_bias, self.u_weights, 
+        #         self.box.l, self.box.u)
 
 
 def transform_deep_poly(in_dpoly: DeepPoly, layer: nn.Module):
@@ -115,30 +126,34 @@ class DeepPolyVerifier():
         box_l = inputs.detach().numpy() - eps
         box_u = inputs.detach().numpy() + eps
         # Create a deep_poly for inputs
+        print("############# Forward pass ################")
         dpoly_shape = (*inputs.shape, 0)
         self.dpolys.append(DeepPoly(box_l,
                                     np.zeros(dpoly_shape),
                                     box_u,
                                     np.zeros(dpoly_shape),
-                                    Box(box_l, box_u)))
+                                    Box(box_l, box_u),
+                                    "layer0"))
 
-        # print(self.dpolys[-1])
+        print(self.dpolys[-1])
         for layer in self.net_layers:
             self.dpolys.append(transform_deep_poly(self.dpolys[-1], layer))
-            # print(self.dpolys[-1])
+            self.dpolys[-1].name = f"layer{len(self.dpolys) - 1}"
+            print(self.dpolys[-1])
 
     def verify(self) -> bool:
+        print("############# Backsupstitution ################")
         # deep poly abstract bounds of the final layernp.array()
         curr_dpoly = self.dpolys[-1]
+        print(f"Iteration 0:")
         print(curr_dpoly)
-        for i in reversed(range(1, len(self.net_layers) - 1)):
+        for i in reversed(range(1, len(self.dpolys) - 1)):
+            print(f"Iteration {len(self.dpolys) - 1 - i}:")
             if isinstance(self.net_layers[i], nn.Flatten):
                 break
             # calculate the new representation
             curr_dpoly = self.backsubstitute(curr_dpoly,
                                             self.dpolys[i])
-            print(curr_dpoly)
-
             # Recalculate box constraints
             lW = curr_dpoly.l_weights
             lb = curr_dpoly.l_bias
@@ -148,6 +163,8 @@ class DeepPolyVerifier():
             box_l = lb + np.sum(np.minimum(lW * prev_box.l, lW * prev_box.u), axis = 1)
             box_u = ub + np.sum(np.maximum(uW * prev_box.l, uW * prev_box.u), axis = 1)
             curr_dpoly.box = Box(box_l, box_u)
+
+            print(curr_dpoly)
 
             if self.is_provable(curr_dpoly):
                 break
@@ -208,9 +225,8 @@ if __name__ == "__main__":
     l3.weight[:] = torch.Tensor([[-1, 1], [0, 1]])
     l3.bias[:] = torch.Tensor([3, 0])
 
-    net = nn.Sequential(l1, nn.ReLU(), l2, nn.ReLU(), l3)
-
     # Test case 1
+    net = nn.Sequential(l1, nn.ReLU(), l2, nn.ReLU(), l3)
     input = torch.Tensor([0, 0])
     eps = 1
     
@@ -221,3 +237,12 @@ if __name__ == "__main__":
     #     print(dp)
     #     print("==========")
     # print()
+
+    # Test case 2
+    # net = nn.Sequential(l1, nn.ReLU(), l2)
+    # input = torch.Tensor([0, 0])
+    # eps = 1
+    
+    # verifier = DeepPolyVerifier(net, input, eps, 0)
+    # print(f"Verified 1: {verifier.verify()}")
+    
