@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "verifier.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/code",
+            "cwd": "${workspaceFolder}/src",
             "args": [
                 "--net", "fc1",
                 "--spec", "../test_cases/fc1/img0_0.06200.txt"
@@ -20,14 +20,14 @@
             "name": "Box test",
             "type": "python",
             "request": "launch",
-            "program": "code/box.py",
+            "program": "src/box.py",
             "console": "integratedTerminal",
         },
         {
             "name": "DPoly test",
             "type": "python",
             "request": "launch",
-            "program": "code/deep_poly.py",
+            "program": "src/deep_poly.py",
             "console": "integratedTerminal",
         }
     ]
