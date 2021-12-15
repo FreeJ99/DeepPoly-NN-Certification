@@ -8,72 +8,81 @@ from box import transform_box
 from deep_poly import DeepPoly
 from box import Box
 
-def get_positive_mask():
-    raise NotImplementedError
 
-def get_negative_mask():
-    raise NotImplementedError
+def anull_neg(f):
+    return f * (f >= 0)
 
-def substitute_neuron_u_bounds(coef,  in_l_bounds, in_u_bounds):
-    """Performs variable substitution on an inequality.
-    
-    Args:
-        cur_matrix: 
+
+def anull_nonneg(f):
+    return f * (f < 0)
+
+
+def affine_expand(mat):
+    exp_mat = np.vstack([np.zeros(mat.shape[1]), mat])
+    exp_mat[0, 0] = 1
+    return exp_mat
+
+
+def affine_substitute_eq(f, sub_mat):
     """
-    raise NotImplementedError
-    prev_u_tmp_bias = (in_dpoly.u_bias * (cur_dpoly.u_weights[neur] >= 0)) +\
-                    (in_dpoly.l_bias * (cur_dpoly.u_weights[neur] < 0))
-    prev_u_tmp_weights = (in_dpoly.u_weights * (cur_dpoly.u_weights[neur] >= 0)) +\
-                    (in_dpoly.l_weights * (cur_dpoly.u_weights[neur] < 0))
-    u_bias[neur] = cur_dpoly.u_bias[neur] + cur_dpoly.u_weights[neur] @ prev_u_tmp_bias.T
-    u_weights[neur] = cur_dpoly.u_weights[neur] @ prev_u_tmp_weights
-
-def substitute_neuron_l_bounds(coef,  in_l_bounds, in_u_bounds):
-    raise NotImplementedError
-    # Lower dpoly bound
-    prev_l_tmp_bias = (in_dpoly.l_bias * (cur_dpoly.l_weights[neur] >= 0)) +\
-                    (in_dpoly.u_bias * (cur_dpoly.l_weights[neur] < 0))
-    prev_l_tmp_weights = (in_dpoly.l_weights * (cur_dpoly.l_weights[neur] >= 0)) +\
-                    (in_dpoly.u_weights * (cur_dpoly.l_weights[neur] < 0))
-    l_bias[neur] = cur_dpoly.l_bias[neur] + cur_dpoly.l_weights[neur] @ prev_l_tmp_bias.T
-    l_weights[neur] = cur_dpoly.l_weights[neur] @ prev_l_tmp_weights
+    f (, n+1) = [a_0 a_1 ... a_n]
+        z = a_0 + a_1 * y_1 + ... + a_n * y_n
+    sub_mat (n, m+1) = [b | B]
+        y_1 = b_1_0 + b_1_1 * y_1 + ... + b_1_m * y_m
+        ...
+        y_n = b_n_0 + b_n_1 * y_1 + ... + b_n_m * y_m
+    """
+    return f @ affine_expand(sub_mat)
 
 
-def substitute_layer_u_bounds(u_combined, in_l_combined, in_u_combined):
-    raise NotImplementedError
-    new_rows = []
-    for row in range(cur_dpoly.layer_shape[0]): # TODO 1D dependant
-        # Select lower or upper bounds from the previous layer
-        # depending on the weights in the current neuron
-        in_u_mask = get_positive_mask()
-        in_l_mask = get_negetive_mask()
-        combined_in = (in_dpoly.u_combined() * in_u_mask
-                    + in_dpoly.l_combined() * in_l_mask)
-        
-        # Substitutes the new input variables
-        new_row = row @ combined_in
-        new_rows.append(new_row)
+def affine_substitute_lt(f, sub_mat_l, sub_mat_u):
+    """
+    f (, n+1) = [a_0 a_1 ... a_n]
+        z <= a_0 + a_1 * y_1 + ... + a_n * y_n
+    sub_mat_l (n, m+1) = [b | B]
+        y_1 >= b_1_0 + b_1_1 * y_1 + ... + b_1_m * y_m
+        ...
+        y_n >= b_n_0 + b_n_1 * y_1 + ... + b_n_m * y_m
+    sub_mat_u (n, m+1) = [b | B] 
+    (b and B not the same as in sub_mat_l)
+        y_1 <= b_1_0 + b_1_1 * y_1 + ... + b_1_m * y_m
+        ...
+        y_n <= b_n_0 + b_n_1 * y_1 + ... + b_n_m * y_m
+    """
+    return (anull_neg(f) @ affine_expand(sub_mat_u) +
+        anull_nonneg(f) @ affine_expand(sub_mat_l))
 
-    new_rows = np.vstack(new_rows)
-    in_dpoly.u_weights = new_rows[:, 1:]
-    in_dpoly.u_bias = new_rows[:, 0]
+def affine_substitute_gt(f, sub_mat_l, sub_mat_u):
+    """
+    f (, n+1) = [a_0 a_1 ... a_n]
+        z >= a_0 + a_1 * y_1 + ... + a_n * y_n
+    sub_mat_l (n, m+1) = [b | B]
+        y_1 >= b_1_0 + b_1_1 * y_1 + ... + b_1_m * y_m
+        ...
+        y_n >= b_n_0 + b_n_1 * y_1 + ... + b_n_m * y_m
+    sub_mat_u (n, m+1) = [b | B]
+    (b and B not the same as in sub_mat_l)
+        y_1 <= b_1_0 + b_1_1 * y_1 + ... + b_1_m * y_m
+        ...
+        y_n <= b_n_0 + b_n_1 * y_1 + ... + b_n_m * y_m
+    """
+    return (anull_neg(f) @ affine_expand(sub_mat_l) +
+        anull_nonneg(f) @ affine_expand(sub_mat_u))
 
-def substitute_layer_l_bounds(coef_matrix, in_l_coef, in_u_coef):
-    raise NotImplementedError
 
-def backsub_transform(cur_dpoly: DeepPoly):
+def backsub_transform(dpoly: DeepPoly):
     '''Expresses cur_dpoly in terms of the inputs to in_dpoly.
     
     Works in place.
     '''
-    cur_dpoly.u_weights, cur_dpoly.u_bias = substitute_layer_u_bounds(
-        cur_dpoly.u_combined(),
-        cur_dpoly.in_dpoly.l_combined_with_ones(),
-        cur_dpoly.in_dpoly.u_combined_with_ones()
-    )
-    cur_dpoly.l_weights, cur_dpoly.l_bias = substitute_layer_l_bounds()
-
-    cur_dpoly.calculate_box()
+    for i in range(dpoly.n_neur()):
+        neur = dpoly.get_neur(i)
+        in_dpoly = dpoly.in_dpoly
+        new_l = affine_substitute_gt(neur.l, in_dpoly.l_combined(), in_dpoly.u_combined())
+        new_u = affine_substitute_lt(neur.u, in_dpoly.l_combined(), in_dpoly.u_combined())
+        dpoly.update_neur(i, new_l[0], new_l[1:], new_u[0], new_u[1:])
+    
+    dpoly.calculate_box()
 
 
 def layer_transform(in_dpoly: DeepPoly, layer: nn.Module):

@@ -1,7 +1,10 @@
 from typing import Tuple
+from collections import namedtuple
 
 import numpy as np
 from box import Box
+
+DTYPE = np.float64
 
 class DeepPoly():
     l_bias: np.ndarray
@@ -9,20 +12,27 @@ class DeepPoly():
     u_bias: np.ndarray
     u_weights: np.ndarray
     box: Box
-    # in_dpoly: DeepPoly TODO 
+    # in_dpoly: DeepPoly # TODO 
     name: str # useful for debugging
 
-    def __init__(self, in_dpoly, l_bias, l_weights, u_bias, u_weights, box, 
+    def __init__(self, in_dpoly, l_bias, l_weights, u_bias, u_weights, box = None,
             name = ""):
-        self.l_bias = l_bias
-        self.l_weights = l_weights
-        self.u_bias = u_bias
-        self.u_weights = u_weights
-        self.box = box
+        self.l_bias = np.array(l_bias, dtype = DTYPE)
+        self.l_weights = np.array(l_weights, dtype = DTYPE)
+        self.u_bias = np.array(u_bias, dtype = DTYPE)
+        self.u_weights = np.array(u_weights, dtype = DTYPE)
         self.in_dpoly = in_dpoly
         self.name = name
-    
+        if box is None:
+            self.calculate_box()
+        else:
+            self.box = box
+
     def calculate_box(self):
+        if self.in_dpoly is None:
+            self.box = None
+            return
+
         lW = self.l_weights
         lb = self.l_bias
         uW = self.u_weights
@@ -35,18 +45,36 @@ class DeepPoly():
         self.box = Box(box_l, box_u)
 
     def l_combined(self) -> np.ndarray:
-        return np.hstack([self.l_bias, self.l_weights])
+        """Merges weights and bias."""
+        return np.hstack([np.expand_dims(self.l_bias, 1), self.l_weights])
 
     def u_combined(self) -> np.ndarray:
-        return np.hstack([self.u_bias, self.u_weights])
+        return np.hstack([np.expand_dims(self.u_bias, 1), self.u_weights])
 
-    def l_combined_with_ones(self) -> np.ndarray:
+    def l_combined_ones(self) -> np.ndarray:
         l_combined = self.l_combined()
         return np.vstack([np.ones(l_combined.shape[1]), l_combined])
 
-    def u_combined_with_ones(self) -> np.ndarray:
+    def u_combined_ones(self) -> np.ndarray:
         u_combined = self.u_combined()
         return np.vstack([np.ones(u_combined.shape[1]), u_combined])
+
+    def n_neur(self):
+        """Returns the number of neurons in the layer."""
+        return self.l_weights.shape[0]
+
+    def get_neur(self, idx):
+        AbstractNeuron = namedtuple('AbstractNeuron', 'l u')
+        return AbstractNeuron(
+            l = self.l_combined()[idx],
+            u = self.u_combined()[idx]
+        )
+
+    def update_neur(self, idx, new_lb, new_lw, new_ub, new_uw):
+        self.l_bias[idx] = new_lb
+        self.l_weights[idx] = new_lw
+        self.u_bias[idx] = new_ub
+        self.u_weights[idx] = new_uw
 
     def __repr__(self):
         lines = [f"DPoly {self.name}:"]

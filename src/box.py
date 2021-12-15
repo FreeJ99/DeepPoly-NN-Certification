@@ -15,8 +15,8 @@ class Box():
     u: np.ndarray
 
     def __init__(self, lower_bounds: np.ndarray, upper_bounds: np.ndarray):
-        self.l = lower_bounds
-        self.u = upper_bounds
+        self.l = np.array(lower_bounds)
+        self.u = np.array(upper_bounds)
 
     def __repr__(self):
         return ( f"Box l = {self.l}\n" +

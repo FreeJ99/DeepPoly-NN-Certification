@@ -7,7 +7,7 @@ from torch import nn
 from box import Box
 from deep_poly import DeepPoly
 from networks import FullyConnected
-from deep_poly_transformations import layer_transform, backsub_transform
+from deep_poly_transform import layer_transform, backsub_transform
 
 class DeepPolyVerifier():
     boxes: List[Box]
