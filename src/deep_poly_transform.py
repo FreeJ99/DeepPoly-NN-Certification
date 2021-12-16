@@ -96,28 +96,25 @@ def layer_transform(in_dpoly: DeepPoly, layer: nn.Module):
     else:
         raise NotImplementedError
 
-def normalization_transform(in_dpoly: DeepPoly, layer: Normalization):
-    raise NotImplementedError
-
-    box = transform_box(in_dpoly.box, layer)
-    
+def normalization_transform(dpoly: DeepPoly, layer: Normalization):
     m = layer.mean.detach().numpy()
     s = layer.sigma.detach().numpy()
 
-    l_bias = np.full(in_dpoly.layer_shape, - m / s)
+    l_bias = np.full((dpoly.n_neur(), ), - m / s)
     # l_weights[i,j,k,i,j,k] = 1, number of dimensions might vary
-    l_weights = np.zeros(2 * in_dpoly.layer_shape)
-    l_weights_idx = 2 * list(
-                map(lambda x: list(x),
+    l_weights = np.zeros((dpoly.n_neur(), dpoly.n_neur()))
+    l_weights_idx = 2 * tuple(
+                map(list,
                 zip(
                 *product(
-                *map(range, in_dpoly.layer_shape)))))
+                *map(range, (dpoly.n_neur(),))
+                ))))
     l_weights[l_weights_idx] = 1 / s
 
     u_bias = l_bias.copy()
     u_weights = l_weights.copy()
 
-    return DeepPoly(l_bias, l_weights, u_bias, u_weights, box)
+    return DeepPoly(dpoly, l_bias, l_weights, u_bias, u_weights)
 
 
 def linear_transform(in_dpoly: DeepPoly, layer: nn.Linear):

@@ -1,8 +1,10 @@
 import torch
 from torch import nn
 
+from networks import Normalization
 from deep_poly_transform import *
 from box import Box
+
 
 def test_affine_substitute():
     f = np.array([5, 3, -2])
@@ -96,6 +98,24 @@ def test_relu_transform():
         [1.875, 0, 0, 0, 0.625]
     ]))
 
+def test_normalization_transform():
+    layer = Normalization('cpu')
+    in_dpoly = DeepPoly(None,
+        [0, 0],
+        [[0, 0], [0, 0]],
+        [1, 1],
+        [[0.5, 0], [0, 0.5]],
+        Box([0, 2], [0, 2])
+    )
+    exp_lu = [
+        [-0.424212918, 3.245699448, 0],
+        [-0.424212918, 0, 3.245699448],
+    ]
+
+    dpoly = normalization_transform(in_dpoly, layer)
+
+    assert np.all(np.isclose(dpoly.l_combined(), exp_lu))
+    assert np.all(np.isclose(dpoly.u_combined(), exp_lu))
 
 if __name__ == "__main__":
-    test_relu_transform()
+    test_normalization_transform()

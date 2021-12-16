@@ -5,6 +5,7 @@ class Normalization(nn.Module):
 
     def __init__(self, device):
         super(Normalization, self).__init__()
+        # TODO why does this loose so much precision when retrieved
         self.mean = torch.FloatTensor([0.1307]).view((1, 1, 1, 1)).to(device)
         self.sigma = torch.FloatTensor([0.3081]).view((1, 1, 1, 1)).to(device)
 
