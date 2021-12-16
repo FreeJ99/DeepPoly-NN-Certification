@@ -16,13 +16,26 @@ class DeepPoly():
     name: str # useful for debugging
 
     def __init__(self, in_dpoly, l_bias, l_weights, u_bias, u_weights, box = None,
-            name = ""):
+            in_shape = None, layer_shape = None, name = ""):
         self.l_bias = np.array(l_bias, dtype = DTYPE)
         self.l_weights = np.array(l_weights, dtype = DTYPE)
         self.u_bias = np.array(u_bias, dtype = DTYPE)
         self.u_weights = np.array(u_weights, dtype = DTYPE)
         self.in_dpoly = in_dpoly
         self.name = name
+
+        if in_shape is None and layer_shape is None:
+            self.in_shape = self.l_weights.shape[1:]
+            self.layer_shape = self.l_weights.shape[0:1]
+        elif in_shape is not None:
+            self.in_shape = in_shape
+            layer_ndim = len(self.l_weights.shape) - len(in_shape)
+            self.layer_shape = self.l_weights.shape[0:layer_ndim]
+        elif layer_shape is not None:
+            self.layer_shape = layer_shape
+            layer_ndim = len(layer_shape)
+            self.in_shape = self.l_weights.shape[layer_ndim:]
+
         if box is None:
             self.calculate_box()
         else:
@@ -33,16 +46,20 @@ class DeepPoly():
             self.box = None
             return
 
-        lW = self.l_weights
-        lb = self.l_bias
-        uW = self.u_weights
-        ub = self.u_bias
-        prev_box = self.in_dpoly.box
-        box_l = lb + np.sum(np.minimum(lW * prev_box.l, lW * prev_box.u), 
+        lb, lW, ub, uW = self.biflatten()
+        prev_box_l, prev_box_u = self.in_dpoly.box.flatten()
+        box_l = lb + np.sum(np.minimum(lW * prev_box_l, lW * prev_box_u), 
             axis = 1)
-        box_u = ub + np.sum(np.maximum(uW * prev_box.l, uW * prev_box.u), 
+        box_u = ub + np.sum(np.maximum(uW * prev_box_l, uW * prev_box_u), 
             axis = 1)
-        self.box = Box(box_l, box_u)
+        self.box = Box(box_l.reshape(self.layer_shape), box_u.reshape(self.layer_shape))
+
+    def biflatten(self):
+        lb = self.l_bias.flatten()
+        lW = self.l_weights.reshape(self.layer_size(), self.in_size())
+        ub = self.u_bias.flatten()
+        uW = self.u_weights.reshape(self.layer_size(), self.in_size())
+        return lb, lW, ub, uW
 
     def l_combined(self) -> np.ndarray:
         """Merges weights and bias."""
@@ -69,6 +86,12 @@ class DeepPoly():
             l = self.l_combined()[idx],
             u = self.u_combined()[idx]
         )
+
+    def layer_size(self):
+        return np.product(self.layer_shape)
+        
+    def in_size(self):
+        return np.product(self.in_shape)
 
     def update_neur(self, idx, new_lb, new_lw, new_ub, new_uw):
         self.l_bias[idx] = new_lb

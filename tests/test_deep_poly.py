@@ -50,5 +50,43 @@ def test_combined_and_ones():
     assert np.all(l_comb == exp_l_comb)
     assert np.all(u_comb1 == exp_u_comb1)
 
+def test_calculate_box_2d():
+    in_dpoly = DeepPoly(None,
+        None, None, None, None,
+        Box([[-1, -1], [-1, -1]], [[1, 1], [1, 1]]),
+        in_shape = (2, 2)
+    )
+
+    # 2x2x2x2
+    l_weights = [
+        [
+            [[-1, 0], [1, 0]],
+            [[0, 1], [1, 0]]
+        ],
+        [
+            [[-1, 1], [1, 0]],
+            [[0, 0], [0, -1]]
+        ]
+    ]
+
+    dpoly = DeepPoly(in_dpoly,
+        [[-1, 1], [2, 0]],
+        l_weights,
+        [[-1, 1], [2, 0]],
+        l_weights.copy(),
+        in_shape = (2, 2)
+    )
+    exp_box_l = [
+        [-3, -1],
+        [-1, -1]
+    ]
+    exp_box_u = [
+        [1, 3],
+        [5, 1]
+    ]
+
+    assert np.all(np.isclose(dpoly.box.l, exp_box_l))
+    assert np.all(np.isclose(dpoly.box.u, exp_box_u))
+
 if __name__ == "__main__":
-    test_combined()
+    test_calculate_box_2d()

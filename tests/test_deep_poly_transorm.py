@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 from torch import nn
 
@@ -117,5 +119,29 @@ def test_normalization_transform():
     assert np.all(np.isclose(dpoly.l_combined(), exp_lu))
     assert np.all(np.isclose(dpoly.u_combined(), exp_lu))
 
+def test_flatten_transform():
+    in_dpoly = DeepPoly(None,
+        np.zeros((2, 2)),
+        np.zeros((2, 2, 2, 2)),
+        np.zeros((2, 2)),
+        np.zeros((2, 2, 2, 2)),
+        Box([[0, 1],[2, 3]], [[4, 5],[6,7]]),
+        in_shape = (2, 2)
+    )
+    exp_luw = [
+        [[1, 0], [0, 0]],
+        [[0, 1], [0, 0]],
+        [[0, 0], [1, 0]],
+        [[0, 0], [0, 1]],
+    ]
+    exp_lub = [0, 0, 0, 0]
+
+    dpoly = flatten_transform(in_dpoly)
+
+    assert np.all(dpoly.l_bias == exp_lub)
+    assert np.all(dpoly.l_weights == exp_luw)
+    assert np.all(dpoly.u_bias == exp_lub)
+    assert np.all(dpoly.u_weights == exp_luw)
+
 if __name__ == "__main__":
-    test_normalization_transform()
+    test_flatten_transform()

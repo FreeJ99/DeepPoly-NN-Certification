@@ -18,6 +18,9 @@ class Box():
         self.l = np.array(lower_bounds)
         self.u = np.array(upper_bounds)
 
+    def flatten(self):
+        return self.l.flatten(), self.u.flatten()
+
     def __repr__(self):
         return ( f"Box l = {self.l}\n" +
                 f"Box u = {self.u}" )

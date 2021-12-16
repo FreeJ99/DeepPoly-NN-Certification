@@ -88,7 +88,7 @@ def layer_transform(in_dpoly: DeepPoly, layer: nn.Module):
     if isinstance(layer, Normalization):
         return normalization_transform(in_dpoly, layer)
     elif isinstance(layer, nn.Flatten):
-        raise NotImplementedError
+        return flatten_transform(in_dpoly)
     elif isinstance(layer, nn.Linear):
        return linear_transform(in_dpoly, layer)   
     elif isinstance(layer, nn.ReLU):
@@ -155,3 +155,21 @@ def relu_transform(in_dpoly: DeepPoly):
     u_weights[crossing_idx] = np.diag(slope)[crossing_idx]
 
     return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights)
+
+
+def flatten_transform(in_dpoly: DeepPoly):
+    size = in_dpoly.layer_size()
+    shape = in_dpoly.layer_shape
+    
+    l_bias = np.zeros(size)
+    # k-th neuron in the flatten layer corresponds to
+    # the k-th neuron in the input layer
+    l_weights = np.zeros((size, *shape))
+    l_weights_view = l_weights.reshape(size, -1)
+    np.fill_diagonal(l_weights_view, 1)
+
+    u_bias = np.zeros(size)
+    u_weights = l_weights.copy()
+
+    return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights,
+        in_shape = shape)
