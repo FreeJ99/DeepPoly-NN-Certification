@@ -61,7 +61,7 @@ class DeepPoly():
 
     def n_neur(self):
         """Returns the number of neurons in the layer."""
-        return self.l_weights.shape[0]
+        return self.box.l.shape[0]
 
     def get_neur(self, idx):
         AbstractNeuron = namedtuple('AbstractNeuron', 'l u')

@@ -1,4 +1,8 @@
+import torch
+from torch import nn
+
 from deep_poly_transform import *
+from box import Box
 
 def test_affine_substitute():
     f = np.array([5, 3, -2])
@@ -59,5 +63,39 @@ def test_backsub_transform():
         [1, 0.5, 0]
     ])
 
+def test_linear_transform():
+    layer = nn.Linear(2, 2)
+    layer.weight[:] = torch.Tensor([[-1, 2], [5, -18]])
+    layer.bias[:] = torch.Tensor([7, -2])
+    in_dpoly = DeepPoly(None, None, None, None, None,
+        box = Box([-1, -2], [3, 1]))
+    lu_exp = [[7, -1, 2], [-2, 5, -18]]
+
+    dpoly = linear_transform(in_dpoly, layer)
+
+    
+    assert np.all(dpoly.l_combined() == lu_exp)
+    assert np.all(dpoly.u_combined() == lu_exp)
+
+def test_relu_transform():
+    in_dpoly = DeepPoly(None, None, None, None, None, 
+        box = Box([1, -4, -2, -3], [5, -2, 2, 5]))
+
+    dpoly = relu_transform(in_dpoly)
+
+    assert np.all(np.isclose(dpoly.l_combined(), [
+        [0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0]
+    ]))
+    assert np.all(np.isclose(dpoly.u_combined(), [
+        [0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [1, 0, 0, 0.5, 0],
+        [1.875, 0, 0, 0, 0.625]
+    ]))
+
+
 if __name__ == "__main__":
-    test_backsub_transform()
+    test_relu_transform()

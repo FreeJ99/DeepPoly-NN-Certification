@@ -4,9 +4,7 @@ import numpy as np
 from torch import nn
 
 from networks import Normalization
-from box import transform_box
-from deep_poly import DeepPoly
-from box import Box
+from deep_poly import DTYPE, DeepPoly
 
 
 def anull_neg(f):
@@ -81,7 +79,8 @@ def backsub_transform(dpoly: DeepPoly):
         new_l = affine_substitute_gt(neur.l, in_dpoly.l_combined(), in_dpoly.u_combined())
         new_u = affine_substitute_lt(neur.u, in_dpoly.l_combined(), in_dpoly.u_combined())
         dpoly.update_neur(i, new_l[0], new_l[1:], new_u[0], new_u[1:])
-    
+
+    dpoly.in_dpoly = dpoly.in_dpoly.in_dpoly
     dpoly.calculate_box()
 
 
@@ -93,7 +92,7 @@ def layer_transform(in_dpoly: DeepPoly, layer: nn.Module):
     elif isinstance(layer, nn.Linear):
        return linear_transform(in_dpoly, layer)   
     elif isinstance(layer, nn.ReLU):
-        return relu_transform(in_dpoly, layer)
+        return relu_transform(in_dpoly)
     else:
         raise NotImplementedError
 
@@ -122,10 +121,6 @@ def normalization_transform(in_dpoly: DeepPoly, layer: Normalization):
 
 
 def linear_transform(in_dpoly: DeepPoly, layer: nn.Linear):
-    raise NotImplementedError
-
-    box = transform_box(in_dpoly.box, layer)
-
     W = layer.weight.detach().numpy()
     b = layer.bias.detach().numpy()
     l_bias = b.copy()
@@ -133,16 +128,13 @@ def linear_transform(in_dpoly: DeepPoly, layer: nn.Linear):
     u_bias = b.copy()
     u_weights = W.copy()
 
-    return DeepPoly(l_bias, l_weights, u_bias, u_weights, box)
+    return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights)
 
 
-def relu_transform(in_dpoly: DeepPoly, layer: nn.Linear):
-    raise NotImplementedError
-
-    box = transform_box(in_dpoly.box, layer)
-
-    l_bias = np.zeros(in_dpoly.layer_shape)
-    l_weights = np.zeros(2 * in_dpoly.layer_shape)
+def relu_transform(in_dpoly: DeepPoly):
+    n_neur = in_dpoly.n_neur()
+    l_bias = np.zeros(n_neur, dtype = DTYPE)
+    l_weights = np.zeros((n_neur, n_neur), dtype = DTYPE)
     u_bias = l_bias.copy()
     u_weights = l_weights.copy()
 
@@ -150,10 +142,12 @@ def relu_transform(in_dpoly: DeepPoly, layer: nn.Linear):
     # all values already set to 0
 
     pos_idx = in_dpoly.box.l >= 0
-    l_bias[pos_idx] = in_dpoly.l_bias[pos_idx]
-    l_weights[pos_idx] = np.eye(in_dpoly.layer_shape[0])[pos_idx]
-    u_bias[pos_idx] = in_dpoly.u_bias[pos_idx]
-    u_weights[pos_idx] = l_weights[pos_idx]
+    # l_bias[pos_idx] = in_dpoly.l_bias[pos_idx]
+    # l_bias already set to 0
+    l_weights[pos_idx] = np.eye(n_neur)[pos_idx]
+    # u_bias[pos_idx] = in_dpoly.u_bias[pos_idx]
+    # u_bias already set to 0
+    u_weights[pos_idx] = np.eye(n_neur)[pos_idx]
 
     crossing_idx = ~(neg_idx | pos_idx)
     slope = (in_dpoly.box.u) / (in_dpoly.box.u - in_dpoly.box.l)
@@ -163,4 +157,4 @@ def relu_transform(in_dpoly: DeepPoly, layer: nn.Linear):
     u_bias[crossing_idx] = y_intercept[crossing_idx]
     u_weights[crossing_idx] = np.diag(slope)[crossing_idx]
 
-    return DeepPoly(l_bias, l_weights, u_bias, u_weights, box)
+    return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights)

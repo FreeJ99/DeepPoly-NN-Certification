@@ -1,0 +1,160 @@
+I have performed backsubstitution at every step (even after ReLu layers),
+but stored the set of bounds after the backsubstitution. Thus, each layer
+is expressed in terms of x1 and x2 after backsub. This allows me to perform
+only one backward step for each layer, since at each step the second-to-last 
+DeepPoly is already expressed in terms of x1 and x2. 
+
+DPoly layer0:
+neur0:  # x1
+	>= [] + -1.0
+	<= [] + 1.0
+	l = -1.0
+	u = 1.0
+neur1:  # x2
+	>= [] + -1.0
+	<= [] + 1.0
+	l = -1.0
+	u = 1.0
+
+
+DPoly layer1:
+neur0:  # x3
+	>= [1. 1.] + 0.0
+	<= [1. 1.] + 0.0
+	l = -2.0
+	u = 2.0
+neur1:  # x4
+	>= [ 1. -1.] + 0.0
+	<= [ 1. -1.] + 0.0
+	l = -2.0
+	u = 2.0
+
+
+After backsub
+DPoly layer1:
+neur0:  # x3
+	>= [1. 1.] + 0.0
+	<= [1. 1.] + 0.0
+	l = -2.0
+	u = 2.0
+neur1:  # x4
+	>= [ 1. -1.] + 0.0
+	<= [ 1. -1.] + 0.0
+	l = -2.0
+	u = 2.0
+
+
+DPoly layer2:
+neur0:  # x5
+	>= [0. 0.] + 0.0
+	<= [0.5 0. ] + 1.0
+	l = 0.0
+	u = 2.0
+neur1:  # x6
+	>= [0. 0.] + 0.0
+	<= [0.  0.5] + 1.0
+	l = 0.0
+	u = 2.0
+
+
+After backsub
+DPoly layer2:
+neur0:  # x5
+	>= [0. 0.] + 0.0
+	<= [0.5 0.5] + 1.0
+	l = 0.0
+	u = 2.0
+neur1:  # x6
+	>= [0. 0.] + 0.0
+	<= [ 0.5 -0.5] + 1.0
+	l = 0.0
+	u = 2.0
+
+
+DPoly layer3:
+neur0:  # x7
+	>= [1. 1.] + -0.5
+	<= [1. 1.] + -0.5
+	l = -0.5
+	u = 3.5
+neur1:  # x8
+	>= [ 1. -1.] + 0.0
+	<= [ 1. -1.] + 0.0
+	l = -2.0
+	u = 2.0
+
+
+After backsub
+DPoly layer3:
+neur0:  # x7
+	>= [0. 0.] + -0.5
+	<= [1. 0.] + 1.5
+	l = -0.5
+	u = 2.5
+neur1:  # x8
+	>= [-0.5  0.5] + -1.0
+	<= [0.5 0.5] + 1.0
+	l = -2.0
+	u = 2.0
+
+
+DPoly layer4:
+neur0: # x9
+	>= [0. 0.] + 0.0
+	<= [0.83333333 0.        ] + 0.4166666666666667
+	l = 0.0
+	u = 2.5
+neur1: # x10
+	>= [0. 0.] + 0.0
+	<= [0.  0.5] + 1.0
+	l = 0.0
+	u = 2.0
+
+
+After backsub
+DPoly layer4:
+neur0: # x9
+	>= [0. 0.] + 0.0
+	<= [0.83333333 0.        ] + 1.6666666666666667
+	l = 0.0
+	u = 2.5
+neur1: # x10
+	>= [0. 0.] + 0.0
+	<= [0.25 0.25] + 1.5
+	l = 0.0
+	u = 2.0
+
+
+DPoly layer5:
+neur0: # x11
+	>= [-1.  1.] + 3.0
+	<= [-1.  1.] + 3.0
+	l = 0.5
+	u = 5.0
+neur1: # x12
+	>= [0. 1.] + 0.0
+	<= [0. 1.] + 0.0
+	l = 0.0
+	u = 2.0
+
+
+After backsub
+DPoly layer5:
+neur0: # x11
+	>= [-0.83333333  0.        ] + 1.3333333333333333
+	<= [0.25 0.25] + 4.5
+	l = 0.4999999999999999
+	u = 5.0
+neur1: # x12
+	>= [0. 0.] + 0.0
+	<= [0.25 0.25] + 1.5
+	l = 0.0
+	u = 2.0
+
+DPoly diff:
+# x11 - x12
+neur1:
+	>= [-1.08333333 -0.25      ] + -0.16666666666666674
+	<= [0.25 0.25] + 4.5
+	l = -1.5000000000000002
+	u = 5.0

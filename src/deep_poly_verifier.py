@@ -1,6 +1,8 @@
+from copy import deepcopy
 from typing import List, Tuple
 
 import numpy as np
+from numpy.lib.function_base import diff
 import torch
 from torch import nn
 
@@ -9,95 +11,93 @@ from deep_poly import DeepPoly
 from networks import FullyConnected
 from deep_poly_transform import layer_transform, backsub_transform
 
+
+def extract_network_layers(net):
+    return [module
+        for module in net.modules()
+        if not isinstance(module, (FullyConnected, nn.Sequential))]
+
+
+def _create_input_dpoly(inputs, eps, input_range):
+    box_l = np.maximum(input_range[0], inputs.detach().numpy() - eps)
+    box_u = np.minimum(input_range[1], inputs.detach().numpy() + eps)
+    # Create a deep_poly for inputs
+    dpoly_shape = (*inputs.shape, 0)
+    return DeepPoly(
+            None,
+            box_l,
+            np.zeros(dpoly_shape),
+            box_u,
+            np.zeros(dpoly_shape),
+            Box(box_l, box_u),
+            "layer0")
+
+def is_provable(dpoly: DeepPoly, true_label, verbose = False) -> bool:
+    n_neur = dpoly.n_neur()
+    tmp = np.zeros((n_neur, n_neur))
+    tmp[:, true_label] = 1
+    weight = tmp - np.eye(n_neur)
+    bias = np.zeros((n_neur))
+
+    layer = nn.Linear(n_neur, n_neur)
+    layer.weight[:] = torch.Tensor(weight)
+    layer.bias[:] = torch.Tensor(bias)
+    
+    diff_dpoly = layer_transform(dpoly, layer)
+    diff_dpoly.name = "diff"
+    backsub_transform(diff_dpoly)
+    # x_true_label - x_true_label = 0, which we don't want
+    diff_dpoly.box.l[true_label] = np.inf
+
+    if verbose:
+        print(diff_dpoly)
+    return np.all(diff_dpoly.box.l > 0)
+
+
 class DeepPolyVerifier():
-    boxes: List[Box]
+    """
+    In this implementation every layer gets immideately 
+    represented in terms of the input.
+    """
     dpolys: List[DeepPoly]
-    true_label: int
-    eps: float
     net_layers: List[nn.Module]
 
     def __init__(self, net: nn.Module):
-        self.net_layers = self.extract_network_layers(net)
+        self.net_layers = extract_network_layers(net)
 
-    def extract_network_layers(self, net):
-        return [module
-            for module in net.modules()
-            if not isinstance(module, (FullyConnected, nn.Sequential))]
-
-    def _create_input_dpoly(self, inputs, eps, input_range):
-        box_l = np.maximum(input_range[0], inputs.detach().numpy() - eps)
-        box_u = np.minimum(input_range[1], inputs.detach().numpy() + eps)
-        # Create a deep_poly for inputs
-        dpoly_shape = (*inputs.shape, 0)
-        return DeepPoly(box_l,
-                np.zeros(dpoly_shape),
-                box_u,
-                np.zeros(dpoly_shape),
-                Box(box_l, box_u),
-                "layer0")
-
-    def verify(self, inputs: torch.Tensor, eps: float, 
-            input_range: Tuple[float, float], true_label: int) -> bool:
-        self.true_label = true_label
-        self.eps = eps
-        self.dpolys = [self._create_input_dpoly(inputs, eps, input_range)]
+    def verify(self, inputs: torch.Tensor, eps: float,
+            true_label: int, 
+            input_range = [-np.inf, +np.inf],
+            verbose = False) -> bool:
+        self.dpolys = [_create_input_dpoly(inputs, eps, input_range)]
 
         # Main loop
-        print(self.dpolys[-1])
+        if verbose:
+            print(self.dpolys[-1])
         for i, layer in enumerate(self.net_layers, 1):
             self.dpolys.append(layer_transform(self.dpolys[-1], layer))
-            if i > 1:
-                # The first layer is laready expressed in terms of input
-                backsub_transform(self.dpolys[i], self.dpolys[i-1])
+            # The first layer is laready expressed in terms of the input
+            if verbose:
+                self.dpolys[-1].name = f"layer{len(self.dpolys) - 1}"
+                print(self.dpolys[-1])
 
-            self.dpolys[-1].name = f"layer{len(self.dpolys) - 1}"
-            print(self.dpolys[-1])
+            if isinstance(layer, nn.Linear):
+                self.backsubstitute(i)
 
-        return self.is_provable(self.dpolys[-1])
-   
-    def is_provable(self, dpoly: DeepPoly) -> bool:
-        l = dpoly.box.l
-        u = dpoly.box.u
-        target_l = l[self.true_label]
-        other_idx = np.arange(len(l)) != self.true_label
-        max_other_score = u[other_idx].max()
+                if verbose:
+                    print("After backsub")
+                    print(self.dpolys[-1])
 
-        if target_l > max_other_score:
-            return True
-        else:
-            return False
+        return is_provable(self.dpolys[-1], true_label, verbose)
 
-
-if __name__ == "__main__":
-    l1 = nn.Linear(2, 2)
-    l1.weight[:] = torch.Tensor([[1, 1], [1, -1]])
-    l1.bias[:] = torch.Tensor([0, 0])
-
-    l2 = nn.Linear(2, 2)
-    l2.weight[:] = torch.Tensor([[1, 1], [1, -1]])
-    l2.bias[:] = torch.Tensor([-0.5, 0])
-
-    l3 = nn.Linear(2, 2)
-    l3.weight[:] = torch.Tensor([[-1, 1], [0, 1]])
-    l3.bias[:] = torch.Tensor([3, 0])
-
-    # Test case 1
-    net = nn.Sequential(l1, nn.ReLU(), l2, nn.ReLU(), l3)
-    input = torch.Tensor([0, 0])
-    eps = 1
-    
-    verifier = DeepPolyVerifier(net, input, eps, 0)
-    print(f"Verified 1: {verifier.verify()}")
-    # print("Bounds:")
-    # for dp in verifier.dpolys:
-    #     print(dp)
-    #     print("==========")
-    # print()
-
-    # Test case 2
-    # net = nn.Sequential(l1, nn.ReLU(), l2)
-    # input = torch.Tensor([0, 0])
-    # eps = 1
-    
-    # verifier = DeepPolyVerifier(net, input, eps, 0)
-    # print(f"Verified 1: {verifier.verify()}")
+    def backsubstitute(self, i):
+        dp = self.dpolys[-1]
+        cp_dpoly = DeepPoly(dp.in_dpoly,
+            dp.l_bias.copy(),
+            dp.l_weights.copy(),
+            dp.u_bias.copy(),
+            dp.u_weights.copy()
+        )
+        for _ in reversed(range(1, i)):
+            backsub_transform(cp_dpoly)
+        self.dpolys[-1].box = cp_dpoly.box
