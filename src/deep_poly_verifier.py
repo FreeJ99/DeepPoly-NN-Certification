@@ -29,8 +29,8 @@ def _create_input_dpoly(inputs, eps, input_range):
             np.zeros(dpoly_shape),
             box_u,
             np.zeros(dpoly_shape),
-            Box(box_l, box_u),
-            "layer0")
+            Box(box_l, box_u)
+    )
 
 def is_provable(dpoly: DeepPoly, true_label, verbose = False) -> bool:
     n_neur = dpoly.n_neur()

@@ -28,7 +28,7 @@ def test_simple_liner_relu():
     verifier = DeepPolyVerifier(net)
 
     # Execution
-    verified = verifier.verify(input, eps, 0, verbose = True)
+    verified = verifier.verify(input, eps, 0, verbose = False)
 
     # Validation
     assert verified == True

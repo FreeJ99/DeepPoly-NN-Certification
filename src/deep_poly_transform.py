@@ -1,6 +1,7 @@
 from itertools import product
 
 import numpy as np
+from numpy.lib import index_tricks
 from torch import nn
 
 from networks import Normalization
@@ -96,25 +97,20 @@ def layer_transform(in_dpoly: DeepPoly, layer: nn.Module):
     else:
         raise NotImplementedError
 
-def normalization_transform(dpoly: DeepPoly, layer: Normalization):
-    m = layer.mean.detach().numpy()
-    s = layer.sigma.detach().numpy()
+def normalization_transform(in_dpoly: DeepPoly, layer: Normalization):
+    mean = layer.mean.detach().numpy()
+    std = layer.sigma.detach().numpy()
 
-    l_bias = np.full((dpoly.n_neur(), ), - m / s)
+    l_bias = np.full(in_dpoly.layer_shape, - mean / std)
     # l_weights[i,j,k,i,j,k] = 1, number of dimensions might vary
-    l_weights = np.zeros((dpoly.n_neur(), dpoly.n_neur()))
-    l_weights_idx = 2 * tuple(
-                map(list,
-                zip(
-                *product(
-                *map(range, (dpoly.n_neur(),))
-                ))))
-    l_weights[l_weights_idx] = 1 / s
+    l_weights = np.zeros(2 * in_dpoly.layer_shape)
+    l_w_view = l_weights.reshape(in_dpoly.layer_size(), in_dpoly.layer_size())
+    np.fill_diagonal(l_w_view, 1 / std)
 
     u_bias = l_bias.copy()
     u_weights = l_weights.copy()
 
-    return DeepPoly(dpoly, l_bias, l_weights, u_bias, u_weights)
+    return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights, layer_shape = (in_dpoly.layer_shape))
 
 
 def linear_transform(in_dpoly: DeepPoly, layer: nn.Linear):
@@ -171,5 +167,4 @@ def flatten_transform(in_dpoly: DeepPoly):
     u_bias = np.zeros(size)
     u_weights = l_weights.copy()
 
-    return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights,
-        in_shape = shape)
+    return DeepPoly(in_dpoly, l_bias, l_weights, u_bias, u_weights)

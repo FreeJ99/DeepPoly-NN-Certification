@@ -16,7 +16,7 @@ class DeepPoly():
     name: str # useful for debugging
 
     def __init__(self, in_dpoly, l_bias, l_weights, u_bias, u_weights, box = None,
-            in_shape = None, layer_shape = None, name = ""):
+            layer_shape = None, name = ""):
         self.l_bias = np.array(l_bias, dtype = DTYPE)
         self.l_weights = np.array(l_weights, dtype = DTYPE)
         self.u_bias = np.array(u_bias, dtype = DTYPE)
@@ -24,17 +24,22 @@ class DeepPoly():
         self.in_dpoly = in_dpoly
         self.name = name
 
-        if in_shape is None and layer_shape is None:
-            self.in_shape = self.l_weights.shape[1:]
-            self.layer_shape = self.l_weights.shape[0:1]
-        elif in_shape is not None:
-            self.in_shape = in_shape
-            layer_ndim = len(self.l_weights.shape) - len(in_shape)
-            self.layer_shape = self.l_weights.shape[0:layer_ndim]
-        elif layer_shape is not None:
+        # layer shape has to be infered
+        # input_shape is optional, but a box has to be given if input_shape isn't
+        if layer_shape is not None and l_weights is not None:
             self.layer_shape = layer_shape
             layer_ndim = len(layer_shape)
             self.in_shape = self.l_weights.shape[layer_ndim:]
+        elif in_dpoly is not None and l_weights is not None:
+            self.in_shape = in_dpoly.layer_shape
+            layer_ndim = len(self.l_weights.shape) - len(self.in_shape)
+            self.layer_shape = self.l_weights.shape[0:layer_ndim]
+        elif l_bias is not None:
+            self.layer_shape = np.array(l_bias).shape
+        elif box.l is not None:
+            self.layer_shape = box.l.shape
+        else:
+            raise Exception("Layer's shape can't be infered.")
 
         if box is None:
             self.calculate_box()

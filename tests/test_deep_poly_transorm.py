@@ -103,10 +103,10 @@ def test_relu_transform():
 def test_normalization_transform():
     layer = Normalization('cpu')
     in_dpoly = DeepPoly(None,
-        [0, 0],
-        [[0, 0], [0, 0]],
-        [1, 1],
-        [[0.5, 0], [0, 0.5]],
+        np.empty(2),
+        np.empty((2, 2)),
+        np.empty(2),
+        np.empty((2, 2)),
         Box([0, 2], [0, 2])
     )
     exp_lu = [
@@ -119,6 +119,36 @@ def test_normalization_transform():
     assert np.all(np.isclose(dpoly.l_combined(), exp_lu))
     assert np.all(np.isclose(dpoly.u_combined(), exp_lu))
 
+def test_normalization_transform_2d():
+    layer = Normalization('cpu')
+    in_dpoly = DeepPoly(None,
+        np.empty((2, 2)),
+        np.empty((2, 2, 2, 2)),
+        np.empty((2, 2)),
+        np.empty((2, 2, 2, 2)),
+        Box(np.empty((2, 2)), np.empty((2, 2))),
+        layer_shape = (2, 2)
+    )
+    exp_lu_w = [
+        [
+            [[3.245699448, 0], [0, 0]],
+            [[0, 3.245699448], [0, 0]]
+        ],
+        [
+            [[0, 0], [3.245699448, 0]],
+            [[0, 0], [0, 3.245699448]]
+        ]
+    ]
+    exp_lu_b = [[-0.424212918, -0.424212918], [-0.424212918, -0.424212918]]
+
+    dpoly = normalization_transform(in_dpoly, layer)
+
+    assert np.all(np.isclose(dpoly.l_weights, exp_lu_w))
+    assert np.all(np.isclose(dpoly.u_weights, exp_lu_w))
+    assert np.all(np.isclose(dpoly.l_bias, exp_lu_b))
+    assert np.all(np.isclose(dpoly.u_bias, exp_lu_b))
+
+
 def test_flatten_transform():
     in_dpoly = DeepPoly(None,
         np.zeros((2, 2)),
@@ -126,7 +156,7 @@ def test_flatten_transform():
         np.zeros((2, 2)),
         np.zeros((2, 2, 2, 2)),
         Box([[0, 1],[2, 3]], [[4, 5],[6,7]]),
-        in_shape = (2, 2)
+        layer_shape = (2, 2)
     )
     exp_luw = [
         [[1, 0], [0, 0]],
@@ -144,4 +174,4 @@ def test_flatten_transform():
     assert np.all(dpoly.u_weights == exp_luw)
 
 if __name__ == "__main__":
-    test_flatten_transform()
+    test_normalization_transform_2d()

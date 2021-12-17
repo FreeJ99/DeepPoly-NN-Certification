@@ -3,24 +3,20 @@ import numpy as np
 from deep_poly import DeepPoly
 from box import Box
 
-def generateDpoly1(in_dpoly):
+
+def test_calculate_box():
+    in_dpoly = DeepPoly(None, None, None, None, None,
+        Box([0, -1], [2, 3]))
     lb = [-0.5, 0.5]
     lw = [[1, 1],
         [1, -1]]
     ub = [-0.5, 0.5]
     uw = [[1, 1],
         [1, -1]]
-    return DeepPoly(in_dpoly, lb, lw, ub, uw, None)
+    dpoly = DeepPoly(in_dpoly, lb, lw, ub, uw)
 
-def test_calculate_box():
-    in_dpoly = DeepPoly(None, None, None, None, None, 
-        Box([0, -1], [2, 3]))
-    dpoly = generateDpoly1(in_dpoly)
-    
     exp_l = [-1.5, -2.5]
     exp_u = [4.5, 3.5]
-    
-    dpoly.calculate_box()
 
     assert np.all(np.isclose(dpoly.box.l, exp_l))
     assert np.all(np.isclose(dpoly.box.u, exp_u))
@@ -54,7 +50,7 @@ def test_calculate_box_2d():
     in_dpoly = DeepPoly(None,
         None, None, None, None,
         Box([[-1, -1], [-1, -1]], [[1, 1], [1, 1]]),
-        in_shape = (2, 2)
+        layer_shape = (2, 2)
     )
 
     # 2x2x2x2
@@ -74,7 +70,7 @@ def test_calculate_box_2d():
         l_weights,
         [[-1, 1], [2, 0]],
         l_weights.copy(),
-        in_shape = (2, 2)
+        layer_shape = (2, 2)
     )
     exp_box_l = [
         [-3, -1],
