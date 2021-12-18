@@ -53,16 +53,13 @@ def test_backsub_transform():
     print(in_dpoly)
     print(dpoly)
 
-    backsub_transform(dpoly)
+    new_dpoly = backsub_transform(dpoly)
 
-    print(dpoly.l_combined())
-    print(dpoly.u_combined())
-
-    assert np.all(dpoly.l_combined() == [
+    assert np.all(new_dpoly.l_combined() == [
         [-0.5, 0, 0],
         [-1, 0, -0.5]
     ])
-    assert np.all(dpoly.u_combined() == [
+    assert np.all(new_dpoly.u_combined() == [
         [1.5, 0.5, 0.5],
         [1, 0.5, 0]
     ])
@@ -82,7 +79,7 @@ def test_linear_transform():
     assert np.all(dpoly.u_combined() == lu_exp)
 
 def test_relu_transform():
-    in_dpoly = DeepPoly(None, None, None, None, None, 
+    in_dpoly = DeepPoly(None, None, None, None, None,
         box = Box([1, -4, -2, -3], [5, -2, 2, 5]))
 
     dpoly = relu_transform(in_dpoly)
@@ -174,4 +171,4 @@ def test_flatten_transform():
     assert np.all(dpoly.u_weights == exp_luw)
 
 if __name__ == "__main__":
-    test_normalization_transform_2d()
+    test_relu_transform()

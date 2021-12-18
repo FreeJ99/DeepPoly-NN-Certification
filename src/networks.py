@@ -3,11 +3,11 @@ import torch.nn as nn
 
 class Normalization(nn.Module):
 
-    def __init__(self, device):
+    def __init__(self, device, mean = 0.1307, sigma = 0.3081):
         super(Normalization, self).__init__()
         # TODO why does this loose so much precision when retrieved
-        self.mean = torch.FloatTensor([0.1307]).view((1, 1, 1, 1)).to(device)
-        self.sigma = torch.FloatTensor([0.3081]).view((1, 1, 1, 1)).to(device)
+        self.mean = torch.FloatTensor([mean]).view((1, 1, 1, 1)).to(device)
+        self.sigma = torch.FloatTensor([sigma]).view((1, 1, 1, 1)).to(device)
 
     def forward(self, x):
         return (x - self.mean) / self.sigma

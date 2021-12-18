@@ -19,8 +19,8 @@ def extract_network_layers(net):
 
 
 def _create_input_dpoly(inputs, eps, input_range):
-    box_l = np.maximum(input_range[0], inputs.detach().numpy() - eps)
-    box_u = np.minimum(input_range[1], inputs.detach().numpy() + eps)
+    box_l = np.maximum(input_range[0], inputs - eps)
+    box_u = np.minimum(input_range[1], inputs + eps)
     # Create a deep_poly for inputs
     dpoly_shape = (*inputs.shape, 0)
     return DeepPoly(
@@ -32,8 +32,18 @@ def _create_input_dpoly(inputs, eps, input_range):
             Box(box_l, box_u)
     )
 
+def backsubstitute(start_dpoly):
+    if start_dpoly.in_dpoly is None:
+        return
+
+    curr_dp = start_dpoly
+    while curr_dp.in_dpoly.in_dpoly is not None:
+        curr_dp = backsub_transform(curr_dp)
+    start_dpoly.box = curr_dp.box
+
 def is_provable(dpoly: DeepPoly, true_label, verbose = False) -> bool:
-    n_neur = dpoly.n_neur()
+    # Sets up a layer that gives the desired differences
+    n_neur = dpoly.layer_size()
     tmp = np.zeros((n_neur, n_neur))
     tmp[:, true_label] = 1
     weight = tmp - np.eye(n_neur)
@@ -43,9 +53,10 @@ def is_provable(dpoly: DeepPoly, true_label, verbose = False) -> bool:
     layer.weight[:] = torch.Tensor(weight)
     layer.bias[:] = torch.Tensor(bias)
     
+    # Creates a dpoly of differences
     diff_dpoly = layer_transform(dpoly, layer)
     diff_dpoly.name = "diff"
-    backsub_transform(diff_dpoly)
+    backsubstitute(diff_dpoly)
     # x_true_label - x_true_label = 0, which we don't want
     diff_dpoly.box.l[true_label] = np.inf
 
@@ -53,11 +64,17 @@ def is_provable(dpoly: DeepPoly, true_label, verbose = False) -> bool:
         print(diff_dpoly)
     return np.all(diff_dpoly.box.l > 0)
 
+def preprocess_inputs(inputs):
+    inputs = inputs.detach().numpy()
+    if inputs.ndim > 2:
+        img_width = int(inputs.size ** 0.5)
+        inputs = inputs.reshape((img_width, img_width))
+
+    return inputs
 
 class DeepPolyVerifier():
     """
-    In this implementation every layer gets immideately 
-    represented in terms of the input.
+    Batches currently not supported.
     """
     dpolys: List[DeepPoly]
     net_layers: List[nn.Module]
@@ -66,38 +83,30 @@ class DeepPolyVerifier():
         self.net_layers = extract_network_layers(net)
 
     def verify(self, inputs: torch.Tensor, eps: float,
-            true_label: int, 
+            true_label: int,
             input_range = [-np.inf, +np.inf],
             verbose = False) -> bool:
+
+        inputs = preprocess_inputs(inputs)
         self.dpolys = [_create_input_dpoly(inputs, eps, input_range)]
+        if verbose:
+            self.dpolys[-1].name = "input"
 
         # Main loop
         if verbose:
             print(self.dpolys[-1])
-        for i, layer in enumerate(self.net_layers, 1):
+        for _, layer in enumerate(self.net_layers, 1):
             self.dpolys.append(layer_transform(self.dpolys[-1], layer))
             # The first layer is laready expressed in terms of the input
             if verbose:
-                self.dpolys[-1].name = f"layer{len(self.dpolys) - 1}"
+                self.dpolys[-1].name = f"layer{len(self.dpolys) - 1}_{type(layer)}"
                 print(self.dpolys[-1])
 
             if isinstance(layer, nn.Linear):
-                self.backsubstitute(i)
+                backsubstitute(self.dpolys[-1])
 
                 if verbose:
                     print("After backsub")
-                    print(self.dpolys[-1])
+                    print(self.dpolys[-1].box, end="\n\n\n")
 
         return is_provable(self.dpolys[-1], true_label, verbose)
-
-    def backsubstitute(self, i):
-        dp = self.dpolys[-1]
-        cp_dpoly = DeepPoly(dp.in_dpoly,
-            dp.l_bias.copy(),
-            dp.l_weights.copy(),
-            dp.u_bias.copy(),
-            dp.u_weights.copy()
-        )
-        for _ in reversed(range(1, i)):
-            backsub_transform(cp_dpoly)
-        self.dpolys[-1].box = cp_dpoly.box

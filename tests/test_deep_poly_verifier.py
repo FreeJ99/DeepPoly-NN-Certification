@@ -3,6 +3,7 @@ import torch
 from torch import nn
 
 from deep_poly_verifier import DeepPolyVerifier
+from networks import FullyConnected, Normalization
 
 def test_simple_liner_relu():
     # Setup
@@ -28,15 +29,52 @@ def test_simple_liner_relu():
     verifier = DeepPolyVerifier(net)
 
     # Execution
-    verified = verifier.verify(input, eps, 0, verbose = False)
+    verified = verifier.verify(input, eps, 0, verbose = True)
+    dpoly = verifier.dpolys[-1]
 
     # Validation
     assert verified == True
-
-    dpoly = verifier.dpolys[-1]
     assert np.all(np.isclose(dpoly.box.l, [0.5, 0]))
     assert np.all(np.isclose(dpoly.box.u, [5, 2]))
 
+def test_simple_fc_net():
+    net = FullyConnected('cpu', 2, [5, 2])
+    net.layers[0].mean = torch.FloatTensor([1]).view((1, 1, 1, 1)).to('cpu')
+    net.layers[0].sigma = torch.FloatTensor([0.5]).view((1, 1, 1, 1)).to('cpu')
+    net.layers[2].weight[:] = torch.Tensor([
+        [1, 0, 1, 0],
+        [1, -1, 1, -1],
+        [0, 0, 0, 1],
+        [-1, 1, 1, 0],
+        [1, -1, 1, 1]
+    ])
+    net.layers[2].bias[:] = torch.Tensor([0, -1, 0, 1, 1])
+    net.layers[4].weight[:] = torch.Tensor([
+        [1, -1, 0, -1, 1],
+        [1, 0, -1, 0, 1]
+    ])
+    net.layers[4].bias[:] = torch.Tensor([1, -1])
+
+    input = torch.FloatTensor([[1, -1], [2, 3]]).view(1, 1, 2, 2)
+    verifier = DeepPolyVerifier(net)
+
+    # Test 1
+    eps = 1
+    verified = verifier.verify(input, eps, 0, verbose = False)
+    dpoly = verifier.dpolys[-1]
+
+    assert verified == False
+    assert np.all(np.isclose(dpoly.box.l, [-1.5833333, 0]))
+    assert np.all(np.isclose(dpoly.box.u, [26,18]))
+
+    # Test 2
+    eps = 0.1
+    verified = verifier.verify(input, eps, 0, verbose = False)
+    dpoly = verifier.dpolys[-1]
+
+    assert verified == True
+    assert np.all(np.isclose(dpoly.box.l, [12.2, 7]))
+    assert np.all(np.isclose(dpoly.box.u, [13.8, 9]))
 
 if __name__ == "__main__":
     test_simple_liner_relu()

@@ -1,5 +1,6 @@
 from typing import Tuple
 from collections import namedtuple
+from itertools import product
 
 import numpy as np
 from box import Box
@@ -14,6 +15,8 @@ class DeepPoly():
     box: Box
     # in_dpoly: DeepPoly # TODO 
     name: str # useful for debugging
+    layer_shape: Tuple[int]
+    in_shape: Tuple[int]
 
     def __init__(self, in_dpoly, l_bias, l_weights, u_bias, u_weights, box = None,
             layer_shape = None, name = ""):
@@ -24,22 +27,24 @@ class DeepPoly():
         self.in_dpoly = in_dpoly
         self.name = name
 
-        # layer shape has to be infered
-        # input_shape is optional, but a box has to be given if input_shape isn't
-        if layer_shape is not None and l_weights is not None:
+        # infers layer_shape
+        if layer_shape is not None:
             self.layer_shape = layer_shape
-            layer_ndim = len(layer_shape)
-            self.in_shape = self.l_weights.shape[layer_ndim:]
-        elif in_dpoly is not None and l_weights is not None:
-            self.in_shape = in_dpoly.layer_shape
-            layer_ndim = len(self.l_weights.shape) - len(self.in_shape)
-            self.layer_shape = self.l_weights.shape[0:layer_ndim]
         elif l_bias is not None:
-            self.layer_shape = np.array(l_bias).shape
-        elif box.l is not None:
+            self.layer_shape = self.l_bias.shape
+        elif box is not None:
             self.layer_shape = box.l.shape
         else:
             raise Exception("Layer's shape can't be infered.")
+
+        # infers in_shape
+        if l_weights is not None:
+            layer_ndim = len(self.layer_shape)
+            self.in_shape = self.l_weights.shape[layer_ndim:]
+        elif in_dpoly is not None:
+            self.in_shape = in_dpoly.layer_shape
+        else:
+            print("Warning: Input's shape can't be infered.")
 
         if box is None:
             self.calculate_box()
@@ -68,10 +73,12 @@ class DeepPoly():
 
     def l_combined(self) -> np.ndarray:
         """Merges weights and bias."""
-        return np.hstack([np.expand_dims(self.l_bias, 1), self.l_weights])
+        lb, lW, _, _ = self.biflatten()
+        return np.hstack([np.expand_dims(lb, 1), lW])
 
     def u_combined(self) -> np.ndarray:
-        return np.hstack([np.expand_dims(self.u_bias, 1), self.u_weights])
+        _, _, ub, uW = self.biflatten()
+        return np.hstack([np.expand_dims(ub, 1), uW])
 
     def l_combined_ones(self) -> np.ndarray:
         l_combined = self.l_combined()
@@ -81,10 +88,6 @@ class DeepPoly():
         u_combined = self.u_combined()
         return np.vstack([np.ones(u_combined.shape[1]), u_combined])
 
-    def n_neur(self):
-        """Returns the number of neurons in the layer."""
-        return self.box.l.shape[0]
-
     def get_neur(self, idx):
         AbstractNeuron = namedtuple('AbstractNeuron', 'l u')
         return AbstractNeuron(
@@ -93,7 +96,7 @@ class DeepPoly():
         )
 
     def layer_size(self):
-        return np.product(self.layer_shape)
+        return int(np.product(self.layer_shape))
         
     def in_size(self):
         return np.product(self.in_shape)
@@ -104,18 +107,18 @@ class DeepPoly():
         self.u_bias[idx] = new_ub
         self.u_weights[idx] = new_uw
 
+    def layer_iterator(self):
+        return product(*map(range, self.layer_shape))
+
     def __repr__(self):
-        lines = [f"DPoly {self.name}:"]
-        for i in range(len(self.l_bias)):
-            lines.append(f"neur{i}:")
-            lines.append(f"\t>= {self.l_weights[i]} + {self.l_bias[i]}")
-            lines.append(f"\t<= {self.u_weights[i]} + {self.u_bias[i]}")
-            lines.append(f"\tl = {self.box.l[i]}")
-            lines.append(f"\tu = {self.box.u[i]}")
-        lines.append("\n")
+        lines = [f"DPoly {self.name} | shape {self.layer_shape}"]
+        for idx in self.layer_iterator():
+            lines.append(f"neur{list(idx)}:")
+            lines.append(f">=\n{self.l_weights[idx]} + {self.l_bias[idx]}")
+            lines.append(f"<=\n{self.u_weights[idx]} + {self.u_bias[idx]}")
+            lines.append(f"l = {self.box.l[idx]}")
+            lines.append(f"u = {self.box.u[idx]}")
+            lines.append("\n")
 
         return "\n".join(lines)
-        # "{0}\n{1}\n{2}\n{3}\nBox:\n{4}\n{5}\n\n"\
-        #     .format(self.l_bias, self.l_weights, self.u_bias, self.u_weights, 
-        #         self.box.l, self.box.u)
     

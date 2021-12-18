@@ -68,21 +68,38 @@ def affine_substitute_gt(f, sub_mat_l, sub_mat_u):
     return (anull_neg(f) @ affine_expand(sub_mat_l) +
         anull_nonneg(f) @ affine_expand(sub_mat_u))
 
+def split_wb(combined: np.ndarray):
+    '''Splits weights and biases in an array.'''
+    return combined[0], combined[1:]
 
 def backsub_transform(dpoly: DeepPoly):
     '''Expresses cur_dpoly in terms of the inputs to in_dpoly.
-    
+
     Works in place.
     '''
-    for i in range(dpoly.n_neur()):
+    in_dpoly: DeepPoly = dpoly.in_dpoly
+    new_l_w = []
+    new_l_b = []
+    new_u_w = []
+    new_u_b = []
+    for i in range(dpoly.layer_size()):
         neur = dpoly.get_neur(i)
-        in_dpoly = dpoly.in_dpoly
-        new_l = affine_substitute_gt(neur.l, in_dpoly.l_combined(), in_dpoly.u_combined())
-        new_u = affine_substitute_lt(neur.u, in_dpoly.l_combined(), in_dpoly.u_combined())
-        dpoly.update_neur(i, new_l[0], new_l[1:], new_u[0], new_u[1:])
+        tmp_l_b, tmp_l_w = split_wb(affine_substitute_gt(
+            neur.l, in_dpoly.l_combined(), in_dpoly.u_combined()))
+        new_l_b.append(tmp_l_b)
+        new_l_w.append(tmp_l_w)
 
-    dpoly.in_dpoly = dpoly.in_dpoly.in_dpoly
-    dpoly.calculate_box()
+        tmp_u_b, tmp_u_w = split_wb(affine_substitute_lt(
+            neur.u, in_dpoly.l_combined(), in_dpoly.u_combined()))
+        new_u_b.append(tmp_u_b)
+        new_u_w.append(tmp_u_w)
+
+    new_l_b = np.array(new_l_b).reshape(dpoly.layer_shape)
+    new_l_w = np.array(new_l_w).reshape((*dpoly.layer_shape, *in_dpoly.in_shape))
+    new_u_b = np.array(new_u_b).reshape(dpoly.layer_shape)
+    new_u_w = np.array(new_u_w).reshape((*dpoly.layer_shape, *in_dpoly.in_shape))
+
+    return DeepPoly(in_dpoly.in_dpoly, new_l_b, new_l_w, new_u_b, new_u_w)
 
 
 def layer_transform(in_dpoly: DeepPoly, layer: nn.Module):
@@ -125,7 +142,7 @@ def linear_transform(in_dpoly: DeepPoly, layer: nn.Linear):
 
 
 def relu_transform(in_dpoly: DeepPoly):
-    n_neur = in_dpoly.n_neur()
+    n_neur = in_dpoly.layer_size()
     l_bias = np.zeros(n_neur, dtype = DTYPE)
     l_weights = np.zeros((n_neur, n_neur), dtype = DTYPE)
     u_bias = l_bias.copy()

@@ -30,7 +30,7 @@ def test_combined_and_ones():
     uw = [[11, 12],
         [13, 14],
         [15, 16]]
-    dpoly = DeepPoly(None, lb, lw, ub, uw, None)
+    dpoly = DeepPoly(None, lb, lw, ub, uw)
 
     exp_l_comb = [[1, 3, 4],
                 [2, 5, 6],
@@ -85,4 +85,4 @@ def test_calculate_box_2d():
     assert np.all(np.isclose(dpoly.box.u, exp_box_u))
 
 if __name__ == "__main__":
-    test_calculate_box_2d()
+    test_calculate_box()
