@@ -20,7 +20,7 @@ def test_fc_relu_2layers_verify():
 
     input = torch.Tensor([0.15, 0.25])
     eps = 0.15
-    verifier = BoxVerifier(net, input, eps, 0)
+    verifier = BoxVerifier(net)
     
     expected_lower_bounds = [
         np.array([0, 0.1]),
@@ -36,7 +36,7 @@ def test_fc_relu_2layers_verify():
     ]
 
     # Execution
-    verified = verifier.verify()
+    verified = verifier.verify(input, eps, 0)
 
     # Validation
     assert verified == True
@@ -62,7 +62,7 @@ def test_fc_relu_2layers_fail():
 
     input = torch.Tensor([0.3, 0.4])
     eps = 0.3
-    verifier = BoxVerifier(net, input, eps, 0)
+    verifier = BoxVerifier(net)
     
     expected_lower_bounds = [
         np.array([0, 0.1]),
@@ -78,7 +78,7 @@ def test_fc_relu_2layers_fail():
     ]
 
     # Execution
-    verified = verifier.verify()
+    verified = verifier.verify(input, eps, 0)
 
     # Validation
     assert verified == False
