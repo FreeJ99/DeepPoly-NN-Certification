@@ -12,6 +12,16 @@
             "console": "integratedTerminal",
         },
         {
+            "name": "evaluate all",
+            "type": "python",
+            "request": "launch",
+            "program": "evaluation/evaluate_all.py",
+            "console": "integratedTerminal",
+            "args": [
+                "-v", "deep_poly"
+            ]
+        },
+        {
             "name": "verifier",
             "type": "python",
             "request": "launch",

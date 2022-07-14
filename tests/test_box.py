@@ -7,6 +7,7 @@ import numpy as np
 from networks import Normalization, FullyConnected
 from box import BoxVerifier
 
+
 def test_fc_relu_2layers_verify():
     # Setup
     l1 = nn.Linear(2, 2)
@@ -21,7 +22,7 @@ def test_fc_relu_2layers_verify():
     input = torch.Tensor([0.15, 0.25])
     eps = 0.15
     verifier = BoxVerifier(net)
-    
+
     expected_lower_bounds = [
         np.array([0, 0.1]),
         np.array([0.1, -0.4]),
@@ -41,8 +42,8 @@ def test_fc_relu_2layers_verify():
     # Validation
     assert verified == True
 
-    for box, expected_l, expected_u in zip(verifier.boxes, 
-            expected_lower_bounds, expected_upper_bounds):
+    for box, expected_l, expected_u in zip(verifier.boxes,
+                                           expected_lower_bounds, expected_upper_bounds):
         assert np.isclose(box.l, expected_l).all()
         assert np.isclose(box.u, expected_u).all()
 
@@ -63,13 +64,13 @@ def test_fc_relu_2layers_fail():
     input = torch.Tensor([0.3, 0.4])
     eps = 0.3
     verifier = BoxVerifier(net)
-    
+
     expected_lower_bounds = [
         np.array([0, 0.1]),
         np.array([0.1, -0.7]),
         np.array([0.1, 0]),
         np.array([0.6, -0.9])
-    ] 
+    ]
     expected_upper_bounds = [
         np.array([0.6, 0.7]),
         np.array([1.3, 0.5]),
@@ -83,12 +84,13 @@ def test_fc_relu_2layers_fail():
     # Validation
     assert verified == False
 
-    for box, expected_l, expected_u in zip(verifier.boxes, 
-            expected_lower_bounds, expected_upper_bounds):
+    for box, expected_l, expected_u in zip(verifier.boxes,
+                                           expected_lower_bounds, expected_upper_bounds):
         assert np.isclose(box.l, expected_l).all()
         assert np.isclose(box.u, expected_u).all()
 
     print()
+
 
 if __name__ == "__main__":
     test_fc_relu_2layers_verify()
